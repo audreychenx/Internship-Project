@@ -1,0 +1,403 @@
+---
+title: "Sell-through Trend Analysis"
+author: "Audrey Chen"
+date: "2018/5/30"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(DT) 
+```
+
+```{r include=FALSE}
+dat <- readxl::read_xlsx("/Users/AudreyChen/Desktop/15-18\ \ Retailer\ ST\ Database\ by\ SKU\ 180509.xlsx",sheet = 2)
+
+dat <- dat %>%
+  select(Year,month, `Distributor SAP`,`Distributor Name`,`Province`,`City`,`Retail No`,`Retailer Name`,
+         `15 Store Type`,`16 Store Type`,`17 Store Type`,`18 Store Type`,`Final S/T`,Pattern)
+
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+dat_15 <- dat %>% filter(Year==2015)
+dat_16 <- dat %>% filter(Year==2016)
+dat_17 <- dat %>% filter(Year==2017)
+dat_18 <- dat %>% filter(Year==2018)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+## create a new variable for 4 series
+dat$series = NA
+
+# ????????????
+dat$series[dat$Pattern=='S100'] = "flat"
+dat$series[dat$Pattern=='S100HFE'] = "flat"
+
+# ????????????
+dat$series[dat$Pattern=='S700'] = "mix"
+dat$series[dat$Pattern=="OMNITRACMSSII"] = "mix"
+
+# ??????
+dat$series[dat$Pattern=="S800"] = "city"
+dat$series[str_detect(dat$Pattern,"URBAN")==TRUE] = "city"
+
+dat$series[is.na(dat$series)==TRUE] = "hwy"
+
+# create sub data sets
+dat_flat <- dat %>% filter(series=="flat")
+dat_mix <- dat %>% filter(series=="mix")
+dat_city <- dat %>% filter(series=="city")
+dat_hwy <- dat %>% filter(series=="hwy") %>% filter(Pattern!="MARATHONLHSLR8")
+```
+
+## Total ST of each pattern since 2015
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+st <- dat %>%
+  select(`Final S/T`,Pattern,series) %>%
+  group_by(Pattern,series) %>%
+  summarise(total = sum(`Final S/T`)) %>%
+  arrange(desc(total))
+
+st <- st[order(st$total),]   
+################# PLOT #####################
+st$series <-factor(st$series)    
+
+# add a new variable color for plot
+st$color = NA
+st$color[st$series=="flat"] <-"red"   
+st$color[st$series=="mix"] <-"blue"
+st$color[st$series=="city"] <-"darkgreen"
+st$color[st$series=="hwy"] <-"purple"
+
+dotchart(st$total,     
+         labels = st$Pattern,    
+         cex = .7,
+         groups = st$series,     
+         gcolor = "black",    
+         color = st$color,    
+         pch = 19,
+         main = "Total Final S/T for Pattern Names \n Grouped by Series",
+         xlab = "Counts")
+```
+
+ > Most patterns fall in the category of **hwy**.
+ Sales of **S200** and **S200+** are far higher than other patterns.
+
+
+## Comparison of Total ST's of each year for 4 series.
+```{r echo=FALSE, warning=FALSE}
+s2 <- dat %>%
+  filter(series=="mix") %>%
+  select(`Final S/T`,Year) %>%
+  group_by(Year) %>%
+  summarise(total = sum(`Final S/T`))
+
+s3 <- dat %>%
+  filter(series=="city") %>%
+  select(`Final S/T`,Year) %>%
+  group_by(Year) %>%
+  summarise(total = sum(`Final S/T`)) 
+
+s4 <- dat %>%
+  filter(series=="flat") %>%
+  select(`Final S/T`,Year) %>%
+  group_by(Year) %>%
+  summarise(total = sum(`Final S/T`))
+
+s1 <- dat %>%
+  filter(series=="hwy") %>%
+  select(`Final S/T`,Year) %>%
+  group_by(Year) %>%
+  summarise(total = sum(`Final S/T`)) 
+
+par(mfrow=c(2,2))
+
+plot(s2$Year,s2$total,xlab = "Year",ylab = "Total ST",main = "Mix")
+lines(s2$Year,s2$total,col="red")
+plot(s3$Year,s3$total,xlab = "Year",ylab = "Total ST",main = "City")
+lines(s3$Year,s3$total,col="red")
+plot(s4$Year,s4$total,xlab = "Year",ylab = "Total ST",main = "Flat")
+lines(s4$Year,s4$total,col="red")
+plot(s1$Year,s1$total,xlab = "Year",ylab = "Total ST",main = "Hwy")
+lines(s1$Year,s1$total,col="red")
+```
+
+> The total ST has been decreasing in the previous three years. This could be related with the decreasing number of distributors. It will be further discussed later. 
+**NOTE:** Data in 2018 only contains four months. Thus, the total ST of this year is not necessary for trend analysis. It can be used to see how far we have got. 
+
+
+## Trend of ST 
+>The following scatter plots show how the product of different patterns, from the same series, contributes to the total ST in each year.
+
+### Series 1 - flat
+```{r echo=FALSE}
+#????????????
+dat_ym <- dat_flat %>%
+  select(`Final S/T`,Pattern,Year,month,`Distributor SAP`) %>%
+  group_by(Pattern,Year) %>%
+  summarise(total = sum(`Final S/T`))
+  
+#datatable(dat_ym, caption = 'Table: Total ST for Series of Flat')
+
+attach(dat_ym)
+ggplot(data.frame(Year,total,Pattern)) + geom_point(aes(x=Year, y =total,color=Pattern)) +
+   xlab("Year") + ylab("Total ST") + ggtitle("Total ST of each year")
+detach(dat_ym)
+```
+
+> In the serious of flat, S100 has got much less popular. The ST of S100HFE has a peak in 2016.
+
+### Series 2 - mix
+```{r echo=FALSE}
+#????????????
+dat_ym2 <- dat_mix %>%
+  select(`Final S/T`,Pattern,Year,month,`Distributor SAP`) %>%
+  group_by(Pattern,Year) %>%
+  summarise(total = sum(`Final S/T`))
+
+#datatable(dat_ym2, caption = 'Table: Total ST for Series of Mix')
+
+attach(dat_ym2)
+ggplot(data.frame(Year,total,Pattern)) + geom_point(aes(x=Year, y =total,color=Pattern)) +
+  xlab("Year") + ylab("Total ST") + ggtitle("Total ST of each year")
+detach(dat_ym2)
+```
+
+
+### Series 3 - city
+```{r echo=FALSE}
+#????????????
+# city group by year 
+dat_ym3 <- dat_city %>%
+  select(`Final S/T`,Pattern,Year,month,`Distributor SAP`) %>%
+  group_by(Pattern,Year) %>%
+  summarise(total = sum(`Final S/T`))
+
+#datatable(dat_ym3, caption = 'Table: Total ST for Series of City')
+
+attach(dat_ym3)
+ggplot(data.frame(Year,total,Pattern)) + geom_point(aes(x=Year, y =total,color=Pattern)) +
+  xlab("Year") + ylab("Total ST") + ggtitle("Total ST of each year")
+detach(dat_ym3)
+```
+
+> Not popular. No data from this year. May be related with the market itself.
+
+### Series 4 - high way
+```{r echo=FALSE}
+dat_ym4 <- dat_hwy %>%
+  select(`Final S/T`,Pattern,Year,month,`Distributor SAP`) %>%
+  group_by(Pattern,Year) %>%
+  summarise(total = sum(`Final S/T`))
+
+datatable(dat_ym4, caption = 'Table: Total ST for Series of Hwy')
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+## ??????????????????
+pat1 <- c("D200","D201","REG.RHDII","REGIONALRHDII+","D200+","D500","R176","R166")
+pat2 <- c("KMAXT","REGIONALRHTII","REGIONALRHTIIHL")
+pat3 <- c("REG.RHSII","REGIONALRHA","REGIONALRHSIIHCT","REGIONALRHSII+","S200+","S201+",
+          "S200","S201","S500","S210KMAX","S202FLEET")
+
+dat_hwy$wheel <- NA 
+dat_hwy$wheel[dat_hwy$Pattern%in%pat1==TRUE]="driving"
+dat_hwy$wheel[dat_hwy$Pattern%in%pat2==TRUE]="trailer"
+dat_hwy$wheel[dat_hwy$Pattern%in%pat3==TRUE]="steering"
+
+# check if all are categorized
+dat_hwy$Pattern[is.na(dat_hwy$wheel)==TRUE]
+```
+
+#### 3 sub-categories (driving, trailer, steering)
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# ???highway?????????
+st <- dat_hwy %>%
+  select(`Final S/T`,Year,wheel) %>%
+  group_by(wheel,Year) %>%
+  summarise(total = sum(`Final S/T`)) %>%
+  arrange(desc(total))
+
+#datatable(st, caption = 'Table: Total ST for 3 Kinds of Wheels')
+
+st <- st[order(st$total),]   
+################# PLOT #####################
+st$Year <-factor(st$Year)    
+
+# add a new variable color for plot
+st$color <- NA
+st$color[st$Year==2015] <-"red"   
+st$color[st$Year==2016] <-"blue"
+st$color[st$Year==2017] <-"darkgreen"
+st$color[st$Year==2018] <-"purple"
+
+dotchart(st$total,     
+         labels = st$wheel,    
+         cex = .7,
+         groups = st$Year,     
+         gcolor = "black",    
+         color = st$color,    
+         pch = 19,
+         main = "Final S/T for Pattern Names \n Grouped by Series",
+         xlab = "Counts")
+```
+
+> **Steering** tires: The ST from 2015 to 2017 has been decreasing. The ST of this year has almost reach half ST of 2017. 
+**Driving** tires: The ST has been increasing. But the ST of this year does not seem satisfying.
+**Trailer** tires: The least popular series.  
+
+##### The decreasing ST might be related with the decreasing number of distributors, as shown below.
+```{r echo=FALSE}
+dist_15 <- unique(dat_15$`Distributor SAP`)
+dist_16 <- unique(dat_16$`Distributor SAP`)
+dist_17 <- unique(dat_17$`Distributor SAP`)
+dist_18 <- unique(dat_18$`Distributor SAP`)
+
+length(dist_15)
+length(dist_16)
+length(dist_17)
+length(dist_18)
+
+all_time <- intersect(intersect(intersect(dist_15,dist_16),dist_17),dist_18)
+
+## ???9???15-18???????????????????????????????????????????????????
+ss <- dat %>%
+  filter(`Distributor SAP` %in% all_time)
+
+## create a new variable for 4 series
+ss$series = NA
+
+# ????????????
+ss$series[ss$Pattern=='S100'] = "flat"
+ss$series[ss$Pattern=='S100HFE'] = "flat"
+
+# ????????????
+ss$series[ss$Pattern=='S700'] = "mix"
+ss$series[ss$Pattern=="OMNITRACMSSII"] = "mix"
+
+# ??????
+ss$series[ss$Pattern=="S800"] = "city"
+ss$series[str_detect(ss$Pattern,"URBAN")==TRUE] = "city"
+
+ss$series[is.na(ss$series)==TRUE] = "hwy"
+
+```
+
+##### Therefore, we pick 9 distributors that have been cooperated with Goodyear from 2015 to 2018.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# test 4 ?????????15-18????????????????????????????????????????????????????????????9???
+s2 <- ss %>%
+  filter(series=="mix") %>%
+  select(`Final S/T`,Year) %>%
+  group_by(Year) %>%
+  summarise(total = sum(`Final S/T`))
+
+s3 <- ss %>%
+  filter(series=="city") %>%
+  select(`Final S/T`,Year) %>%
+  group_by(Year) %>%
+  summarise(total = sum(`Final S/T`)) 
+
+s4 <- ss %>%
+  filter(series=="flat") %>%
+  select(`Final S/T`,Year) %>%
+  group_by(Year) %>%
+  summarise(total = sum(`Final S/T`))
+
+s1 <- ss %>%
+  filter(series=="hwy") %>%
+  select(`Final S/T`,Year) %>%
+  group_by(Year) %>%
+  summarise(total = sum(`Final S/T`)) 
+
+par(mfrow=c(2,2))
+
+plot(s2$Year,s2$total,xlab = "Year",ylab = "Total ST",main = "Mix")
+lines(s2$Year,s2$total,col="red")
+plot(s3$Year,s3$total,xlab = "Year",ylab = "Total ST",main = "City")
+lines(s3$Year,s3$total,col="red")
+plot(s4$Year,s4$total,xlab = "Year",ylab = "Total ST",main = "Flat")
+lines(s4$Year,s4$total,col="red")
+plot(s1$Year,s1$total,xlab = "Year",ylab = "Total ST",main = "Hwy")
+lines(s1$Year,s1$total,col="red")
+```
+
+> The trend of ST is slightly different from plots above.
+
+#### Among these 9 distributors, the number retailers that have sold tires from the series of flat of 2015-2018.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#????????????
+aaa <- ss %>%
+  filter(series=="flat") %>%
+  select(`Final S/T`,Year,`Retail No`,`Distributor SAP`) %>%
+  group_by(`Distributor SAP`)
+
+length(unique(aaa$`Retail No`[aaa$Year==2015]))
+length(unique(aaa$`Retail No`[aaa$Year==2016]))
+length(unique(aaa$`Retail No`[aaa$Year==2017]))
+length(unique(aaa$`Retail No`[aaa$Year==2018]))
+```
+> 11 retailers in 2018.
+
+#### Among these 9 distributors, the number of retailers that have sold tires from the series of hwy of 2015-2018
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#????????????
+aaa <- ss %>%
+  filter(series=="hwy") %>%
+  select(`Final S/T`,Year,`Retail No`,`Distributor SAP`) %>%
+  group_by(`Distributor SAP`)
+
+length(unique(aaa$`Retail No`[aaa$Year==2015]))
+length(unique(aaa$`Retail No`[aaa$Year==2016]))
+length(unique(aaa$`Retail No`[aaa$Year==2017]))
+length(unique(aaa$`Retail No`[aaa$Year==2018]))
+```
+> ~200 less retailers in 2018.
+
+```{r echo=FALSE}
+ss_hwy <- ss %>%
+    filter(series=="hwy") %>% filter(Pattern!="MARATHONLHSLR8")
+  
+ss_hwy$wheel <- NA 
+ss_hwy$wheel[ss_hwy$Pattern%in%pat1==TRUE]="driving"
+ss_hwy$wheel[ss_hwy$Pattern%in%pat2==TRUE]="trailer"
+ss_hwy$wheel[ss_hwy$Pattern%in%pat3==TRUE]="steering"
+
+# check if all are categorized
+ss_hwy$Pattern[is.na(ss_hwy$wheel)==TRUE]
+
+s1 <- ss_hwy %>%
+  select(`Final S/T`,Year, wheel) %>%
+  group_by(Year, wheel) %>%
+  summarise(total = sum(`Final S/T`)) %>%
+  arrange(desc(total))
+
+s1 <- s1[order(st$total),]   
+################# PLOT #####################
+s1$Year <-factor(s1$Year)    
+
+# add a new variable color for plot
+s1$color <- NA
+s1$color[s1$Year==2015] <-"red"   
+s1$color[s1$Year==2016] <-"blue"
+s1$color[s1$Year==2017] <-"darkgreen"
+s1$color[s1$Year==2018] <-"purple"
+
+dotchart(s1$total,     
+         labels = s1$wheel,    
+         cex = .7,
+         groups = s1$Year,     
+         gcolor = "black",    
+         color = s1$color,    
+         pch = 19,
+         main = "Final S/T for Pattern Names \n Grouped by Series",
+         xlab = "Counts")
+
+```
+
+> We could pay attention to the sales of the driving series among these 9 distributors.
